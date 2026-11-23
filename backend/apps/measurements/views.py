@@ -24,6 +24,7 @@ class MeasurementBatchView(APIView):
     FR-6: Validate (coordinate ranges, plausible RSRP, timestamp sanity).
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = "uploads"
 
     @extend_schema(
         request=MeasurementBatchSerializer,
