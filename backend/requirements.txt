@@ -6,11 +6,17 @@ django-environ==0.11.2
 djangorestframework-simplejwt==5.3.1
 django-filter==24.2
 psycopg2-binary==2.9.9
-GDAL==3.8.4
+# GDAL is installed as a system package in Docker (libgdal-dev).
+# The Python binding version must match the system GDAL version.
+# In the Docker image (Debian bookworm / postgis:16-3.4) GDAL 3.6.x ships.
+# We install the binding inside the Dockerfile after the system install, not here,
+# so that the version is auto-detected. If you run locally, pin to your GDAL version.
+# GDAL==<your-system-gdal-version>
 celery==5.4.0
 django-celery-beat==2.6.0
+django-celery-results==2.5.1
 redis==5.0.7
-h3==3.7.7
+h3>=4.1.0
 geojson==3.1.0
 numpy==1.26.4
 pandas==2.2.2

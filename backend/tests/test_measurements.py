@@ -98,6 +98,57 @@ class TestMeasurementBatch:
         m = Measurement.objects.last()
         assert m.contributor == contributor
 
+    def test_altitude_band_auto_classified(self, auth_client):
+        from apps.measurements.models import Measurement
+        reading_no_band = {**VALID_READING, "altitude": 62.0}
+        reading_no_band.pop("altitude_band")
+        response = auth_client.post(self.url, {"readings": [reading_no_band]}, format="json")
+        assert response.status_code == 201
+        m = Measurement.objects.last()
+        assert m.altitude_band == "60"
+
+
+@pytest.mark.django_db
+class TestCellsAndGapViews:
+    def test_cells_list_and_gap_views(self, auth_client):
+        from apps.cells.models import CellStat
+        from django.contrib.gis.geos import Point
+
+        CellStat.objects.create(
+            h3_index="8860a25997fffff",
+            altitude_band="0",
+            centroid=Point(78.35, 17.44, srid=4326),
+            count=20,
+            mean_rsrp=-75.0,
+            fraction_below_threshold=0.0,
+            confidence=0.8,
+        )
+        CellStat.objects.create(
+            h3_index="8860a25997fffff",
+            altitude_band="90",
+            centroid=Point(78.35, 17.44, srid=4326),
+            count=15,
+            mean_rsrp=-115.0,
+            fraction_below_threshold=0.8,
+            confidence=0.75,
+        )
+
+        # GET /api/v1/cells/
+        res_cells = auth_client.get("/api/v1/cells/?altitude=90")
+        assert res_cells.status_code == 200
+
+        # GET /api/v1/cells/gap/
+        res_gap = auth_client.get("/api/v1/cells/gap/?altitude=90")
+        assert res_gap.status_code == 200
+        data = res_gap.data
+        assert len(data) >= 1
+        assert data[0]["delta_rsrp"] == 40.0  # -75 - (-115) = 40 dBm drop
+
+        # Direct PRD path GET /api/v1/gap/
+        res_gap_direct = auth_client.get("/api/v1/gap/?altitude=90")
+        assert res_gap_direct.status_code == 200
+        assert len(res_gap_direct.data) >= 1
+
 
 @pytest.mark.django_db
 class TestRouteRisk:
@@ -122,6 +173,11 @@ class TestRouteRisk:
         assert "overall_risk" in data
         assert "advisory" in data
         assert len(data["segments"]) == 2  # 3 coords = 2 segments
+
+        # Direct PRD path POST /api/v1/route-risk/
+        res_direct = auth_client.post("/api/v1/route-risk/", payload, format="json")
+        assert res_direct.status_code == 200
+        assert len(res_direct.data["segments"]) == 2
 
     def test_invalid_geometry_rejected(self, auth_client):
         payload = {

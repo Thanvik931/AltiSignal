@@ -34,7 +34,9 @@ docker-compose exec backend python manage.py seed_data --count 500
 | GET | `/api/v1/measurements/list/?bbox=&altitude=` | Query measurements |
 | GET | `/api/v1/cells/?bbox=&altitude=` | H3 cell stats |
 | GET | `/api/v1/cells/gap/?bbox=&altitude=` | Gap detection |
+| GET | `/api/v1/gap/?bbox=&altitude=` | Direct PRD path for gap detection |
 | POST | `/api/v1/predictions/route-risk/` | Route risk prediction |
+| POST | `/api/v1/route-risk/` | Direct PRD path for route risk |
 
 ### Running Tests
 ```bash

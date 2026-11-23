@@ -6,8 +6,8 @@ from celery import shared_task
 from django.db import transaction
 from django.contrib.gis.geos import Point
 import numpy as np
-import h3
 import logging
+from apps.cells.h3_utils import cell_to_latlng
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def _aggregate_cell(h3_idx, altitude_band, threshold, Measurement, CellStat):
     confidence = float(min(1.0, n / 100.0))
 
     # H3 centroid
-    lat, lon = h3.cell_to_latlng(h3_idx)
+    lat, lon = cell_to_latlng(h3_idx)
     centroid = Point(lon, lat, srid=4326)
 
     with transaction.atomic():

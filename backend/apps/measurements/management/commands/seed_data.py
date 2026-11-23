@@ -11,7 +11,10 @@ from django.contrib.gis.geos import Point
 from django.conf import settings
 
 from apps.accounts.models import Contributor, ContributorRole
-from apps.measurements.models import Measurement, AltitudeBand
+from apps.measurements.models import Measurement
+from apps.cells.models import CellStat
+from apps.cells.tasks import _aggregate_cell
+from apps.cells.h3_utils import latlng_to_cell
 
 
 # Gachibowli to Kondapur bounding box
@@ -98,12 +101,16 @@ class Command(BaseCommand):
             sinr = random.gauss(5, 8)
             sinr = max(-20.0, min(40.0, sinr))
 
+            resolution = getattr(settings, "H3_RESOLUTION", 8)
+            h3_idx = latlng_to_cell(lat, lon, resolution)
+
             m = Measurement(
                 contributor=random.choice(contributors),
                 timestamp=base_time + timedelta(seconds=i * 2),
                 location=Point(lon, lat, srid=4326),
                 altitude=altitude_m,
                 altitude_band=altitude_band,
+                h3_index=h3_idx,
                 rsrp=round(rsrp, 1),
                 rsrq=round(rsrq, 1),
                 sinr=round(sinr, 1),
@@ -118,8 +125,15 @@ class Command(BaseCommand):
 
         Measurement.objects.bulk_create(measurements, batch_size=200)
 
+        # Aggregate measurements into CellStat
+        self.stdout.write("Aggregating measurements into H3 cells...")
+        threshold = getattr(settings, "LINK_LOSS_RSRP_THRESHOLD", -110)
+        unique_cells = {(m.h3_index, m.altitude_band) for m in measurements if m.h3_index}
+        for h3_idx, band in unique_cells:
+            _aggregate_cell(h3_idx, band, threshold, Measurement, CellStat)
+
         self.stdout.write(self.style.SUCCESS(
-            f"\n✅ Seeded {n_measurements} measurements from {n_contributors} contributors."
+            f"\n✅ Seeded {n_measurements} measurements ({len(unique_cells)} H3 cell-band pairs) from {n_contributors} contributors."
         ))
         self.stdout.write("   Login: admin / AltiAdmin2026!")
         self.stdout.write("   Login: contributor_1 / AltiSignal2026!")

@@ -2,9 +2,9 @@
 Route risk computation service.
 Uses CellStat data as a baseline model (Weekend 5 will add the learned model).
 """
-import h3
 from django.conf import settings
 from apps.cells.models import CellStat
+from apps.cells.h3_utils import latlng_to_cell
 
 
 RISK_LEVELS = {
@@ -46,7 +46,7 @@ def compute_route_risk(route_geojson: dict, altitude_band: str) -> dict:
         # Sample H3 cells along this segment
         interp_pts = _interpolate_points(start, end, n_points=10)
         h3_indices = list({
-            h3.latlng_to_cell(lat, lon, resolution)
+            latlng_to_cell(lat, lon, resolution)
             for lon, lat in interp_pts
         })
 

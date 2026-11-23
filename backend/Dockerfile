@@ -7,12 +7,17 @@ RUN apt-get update && apt-get install -y \
     libgeos-dev \
     libproj-dev \
     binutils \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Install GDAL Python binding pinned to the system GDAL version
+RUN pip install --no-cache-dir GDAL==$(gdal-config --version) && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 

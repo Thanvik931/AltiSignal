@@ -4,7 +4,7 @@ Measurement model — core raw data collected by Android agents.
 from django.contrib.gis.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
-import h3
+from apps.cells.h3_utils import latlng_to_cell
 
 
 class AltitudeBand(models.TextChoices):
@@ -118,7 +118,7 @@ class Measurement(models.Model):
         # Compute H3 index
         if self.location:
             resolution = getattr(settings, "H3_RESOLUTION", 8)
-            self.h3_index = h3.latlng_to_cell(
+            self.h3_index = latlng_to_cell(
                 self.location.y, self.location.x, resolution
             )
         super().save(*args, **kwargs)

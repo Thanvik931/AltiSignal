@@ -51,7 +51,11 @@ class MeasurementBatchView(APIView):
         # Trigger background H3 aggregation for affected cells
         h3_indices = list({m.h3_index for m in created if m.h3_index})
         altitude_bands = list({m.altitude_band for m in created})
-        trigger_aggregation.delay(h3_indices, altitude_bands)
+        try:
+            trigger_aggregation.delay(h3_indices, altitude_bands)
+        except Exception:
+            # Celery/Redis might be offline in development or unit tests; continue safely
+            pass
 
         # Update contributor total_measurements
         request.user.__class__.objects.filter(pk=request.user.pk).update(
@@ -92,10 +96,10 @@ class MeasurementListView(APIView):
             try:
                 parts = [float(p) for p in bbox_param.split(",")]
                 if len(parts) != 4:
-                    raise ValueError
+                    raise ValueError("bbox must contain exactly 4 values")
                 bbox = Polygon.from_bbox(parts)
                 qs = qs.filter(location__within=bbox)
-            except (ValueError, TypeError):
+            except Exception:
                 return Response(
                     {"error": "bbox must be lon_min,lat_min,lon_max,lat_max"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -105,7 +109,10 @@ class MeasurementListView(APIView):
         if altitude:
             qs = qs.filter(altitude_band=altitude)
 
-        limit = min(int(request.query_params.get("limit", 200)), 1000)
+        try:
+            limit = min(int(request.query_params.get("limit", 200)), 1000)
+        except (ValueError, TypeError):
+            limit = 200
         qs = qs[:limit]
 
         serializer = MeasurementReadSerializer(qs, many=True)

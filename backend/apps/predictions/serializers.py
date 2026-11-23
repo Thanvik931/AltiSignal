@@ -46,7 +46,7 @@ class SegmentRiskSerializer(serializers.Serializer):
     end_lat = serializers.FloatField()
     h3_indices = serializers.ListField(child=serializers.CharField())
     link_loss_probability = serializers.FloatField()
-    mean_rsrp = serializers.FloatField(allow_null=True)
+    mean_rsrp = serializers.FloatField(allow_null=True, required=False)
     data_coverage = serializers.FloatField(help_text="Fraction of segment H3 cells with data")
     risk_level = serializers.CharField(help_text="LOW / MEDIUM / HIGH / UNKNOWN")
 
@@ -54,7 +54,7 @@ class SegmentRiskSerializer(serializers.Serializer):
 class RouteRiskResponseSerializer(serializers.Serializer):
     altitude_band = serializers.CharField()
     overall_risk = serializers.FloatField()
-    worst_segment_index = serializers.IntegerField(allow_null=True)
+    worst_segment_index = serializers.IntegerField(allow_null=True, required=False)
     segments = SegmentRiskSerializer(many=True)
     model_version = serializers.CharField()
     advisory = serializers.CharField()

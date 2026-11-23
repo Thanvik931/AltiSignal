@@ -5,12 +5,15 @@ FR-6: POST /measurements — batch accept + validate.
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 from django.contrib.gis.geos import Point
-from .models import Measurement, AltitudeBand
+from django.conf import settings
+from apps.cells.h3_utils import latlng_to_cell
+from .models import Measurement, classify_altitude_band
 
 
 class MeasurementSerializer(serializers.ModelSerializer):
     longitude = serializers.FloatField(write_only=True)
     latitude = serializers.FloatField(write_only=True)
+    altitude_band = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Measurement
@@ -42,6 +45,9 @@ class MeasurementSerializer(serializers.ModelSerializer):
         lon = attrs.pop("longitude")
         lat = attrs.pop("latitude")
         attrs["location"] = Point(lon, lat, srid=4326)
+        # FR-2: Tag altitude band if omitted
+        if not attrs.get("altitude_band") and "altitude" in attrs:
+            attrs["altitude_band"] = classify_altitude_band(attrs["altitude"])
         return attrs
 
 
@@ -59,10 +65,18 @@ class MeasurementBatchSerializer(serializers.Serializer):
     def create(self, validated_data):
         contributor = self.context["request"].user
         readings = validated_data["readings"]
-        objs = [
-            Measurement(contributor=contributor, **reading)
-            for reading in readings
-        ]
+        resolution = getattr(settings, "H3_RESOLUTION", 8)
+
+        objs = []
+        for reading in readings:
+            loc = reading.get("location")
+            h3_index = ""
+            if loc:
+                h3_index = latlng_to_cell(loc.y, loc.x, resolution)
+            if not reading.get("altitude_band") and "altitude" in reading:
+                reading["altitude_band"] = classify_altitude_band(reading["altitude"])
+            objs.append(Measurement(contributor=contributor, h3_index=h3_index, **reading))
+
         return Measurement.objects.bulk_create(objs, batch_size=200)
 
 
@@ -75,3 +89,5 @@ class MeasurementReadSerializer(GeoFeatureModelSerializer):
             "id", "timestamp", "altitude", "altitude_band",
             "rsrp", "rsrq", "sinr", "h3_index",
         ]
+
+

@@ -3,12 +3,13 @@ Route-risk prediction view.
 FR-9: POST /route-risk — GeoJSON LineString + altitude → risk per segment.
 """
 import time
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from drf_spectacular.utils import extend_schema
-from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry
 
 from .serializers import RouteRiskRequestSerializer, RouteRiskResponseSerializer
 from .services import compute_route_risk
@@ -44,10 +45,9 @@ class RouteRiskView(APIView):
         result = compute_route_risk(route_geojson, altitude_band)
         latency_ms = int((time.monotonic() - t0) * 1000)
 
-        # Log the query
-        from django.contrib.gis.geos import GEOSGeometry
+        # Log the query (non-critical — never raise)
         try:
-            geom = GEOSGeometry(str(route_geojson))
+            geom = GEOSGeometry(json.dumps(route_geojson))
             RouteQuery.objects.create(
                 route_geometry=geom,
                 altitude_band=altitude_band,
@@ -55,8 +55,9 @@ class RouteRiskView(APIView):
                 latency_ms=latency_ms,
             )
         except Exception:
-            pass  # Non-critical
+            pass
 
         response_serializer = RouteRiskResponseSerializer(data=result)
         response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
+

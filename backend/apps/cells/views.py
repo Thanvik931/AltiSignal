@@ -13,6 +13,7 @@ from django.conf import settings
 
 from .models import CellStat
 from .serializers import CellStatSerializer, GapCellSerializer
+from apps.cells.h3_utils import cell_to_latlng
 
 
 class CellStatListView(APIView):
@@ -38,9 +39,11 @@ class CellStatListView(APIView):
         if bbox_param:
             try:
                 parts = [float(p) for p in bbox_param.split(",")]
+                if len(parts) != 4:
+                    raise ValueError("bbox must have exactly 4 values")
                 bbox = Polygon.from_bbox(parts)
                 qs = qs.filter(centroid__within=bbox)
-            except (ValueError, TypeError):
+            except Exception:
                 return Response(
                     {"error": "bbox must be lon_min,lat_min,lon_max,lat_max"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -84,10 +87,12 @@ class GapView(APIView):
         if bbox_param:
             try:
                 parts = [float(p) for p in bbox_param.split(",")]
+                if len(parts) != 4:
+                    raise ValueError("bbox must have exactly 4 values")
                 bbox = Polygon.from_bbox(parts)
                 ground_qs = ground_qs.filter(centroid__within=bbox)
                 alt_qs = alt_qs.filter(centroid__within=bbox)
-            except (ValueError, TypeError):
+            except Exception:
                 return Response(
                     {"error": "bbox must be lon_min,lat_min,lon_max,lat_max"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -108,6 +113,11 @@ class GapView(APIView):
                 if alt_cell.centroid:
                     lon = alt_cell.centroid.x
                     lat = alt_cell.centroid.y
+                else:
+                    try:
+                        lat, lon = cell_to_latlng(h3_idx)
+                    except Exception:
+                        pass
                 gap_cells.append({
                     "h3_index": h3_idx,
                     "altitude_band": altitude,
